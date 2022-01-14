@@ -49,6 +49,7 @@ class Chart {
 
     this.fillWorksheets();
     this.fillWorkbook();
+    this.fillDrawings();
 
     this.addFiles();
 
@@ -151,6 +152,60 @@ class Chart {
           },
         ],
       });
+    }
+  }
+
+  fillDrawings() {
+    // write drawings and prepare their _rels
+    let chartCount = 0;
+
+    for (let drawingIndex = 0; drawingIndex < this.document.drawings.length; drawingIndex++) {
+      const drawing = this.document.drawings[drawingIndex];
+      drawing.id = drawingIndex + 1,
+        drawing.fileName = `drawing${drawing.id}.xml`,
+        drawing.relationshipId = `rId${this.relationships.worksheets[drawingIndex].Relationships.Relationship.length + 1}`,
+
+        this.relationships.contentTypes.Types.Override.push({
+          $: {
+            PartName: `/xl/drawings/${drawing.fileName}`,
+            ContentType: CONTENT_TYPES.drawing,
+          },
+        });
+
+      this.relationships.worksheets[drawingIndex] = require('../template/xl/worksheets/_rels/sheet1.xml.rels.json'),
+
+        this.relationships.worksheets[drawingIndex].Relationships.Relationship.push({
+          $: {
+            Id: drawing.relationshipId,
+            Type: RELATION_TYPES.drawing,
+            Target: `../drawings/${drawing.fileName}`,
+          },
+        });
+
+      this.relationships.drawings[drawingIndex] = require('../template/xl/drawings/_rels/drawing1.xml.rels.json');
+
+      // write charts and prepare their _rels
+      for (let chartIndex = 0; chartIndex < drawing.charts.length; chartIndex++) {
+        const chart = drawing.charts[chartIndex];
+        chart.id = chartCount + 1,
+          chart.fileName = `chart${chart.id}.xml`,
+          chart.relationshipId = `rId${this.relationships.drawings[drawingIndex].Relationships.Relationship.length + 1}`,
+
+          this.relationships.contentTypes.Types.Override.push({
+            PartName: `/xl/charts/${chart.fileName}`,
+            ContentType: CONTENT_TYPES.chart,
+          });
+
+        this.relationships.drawings[drawingIndex].Relationships.Relationship.push({
+          $: {
+            Id: chart.relationshipId,
+            Type: RELATION_TYPES.chart,
+            Target: `../charts/${chart.fileName}`,
+          },
+        });
+
+        chartCount = chartCount + 1;
+      }
     }
   }
 
