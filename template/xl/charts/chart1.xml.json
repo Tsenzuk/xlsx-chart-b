@@ -12,6 +12,11 @@
         }
       }
     ],
+    "c:roundedCorners": {
+      "$": {
+        "val": 0
+      }
+    },
     "c:chart": {
       "c:plotArea": {
         "c:layout": {}
