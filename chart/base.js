@@ -84,11 +84,9 @@ class ExcelFile {
       case CONTENT_TYPES.chart: {
         const relationship = new Relationship('chart');
 
-        const relationshipId = relationship.relationshipId;
-        item.relationshipId = relationshipId;
         this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
         this.relationships.drawings[item.id - 1].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
-        this.document.drawings[item.id - 1].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationshipId));
+        this.document.drawings[item.id - 1].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationship.relationshipId));
       }
     }
   }
