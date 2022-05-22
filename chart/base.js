@@ -9,6 +9,7 @@ const RELATION_TYPES = require('./relationTypes');
 const Worksheet = require('./components/Worksheet');
 const Chart = require('./components/Chart');
 const Drawing = require('./components/Drawing');
+const Relationship = require('./components/Relationship');
 
 /**
  * @typedef {Object} ChartOptions
@@ -52,8 +53,6 @@ class ExcelFile {
     const { type } = this.options;
 
     this.fillWorksheets();
-    // this.fillWorkbook();
-    // this.fillDrawings();
 
     this.addFiles();
 
@@ -61,90 +60,35 @@ class ExcelFile {
   }
 
   addItem(item) {
-
-    // this.relationships.contentTypes.Types.Override.push({
-    //   $: {
-    //     PartName: `/xl/worksheets/${item.fileName}`,
-    //     ContentType: item.contentType,
-    //   },
-    // });
-
-
-
     switch (item.contentType) {
       case CONTENT_TYPES.worksheet: {
-        const relationshipId = `rId${this.relationships.workbook.Relationships.Relationship.length + 1}`;
-        item.relationshipId = relationshipId;
-        this.relationships.contentTypes.Types.Override.push({
-          $: {
-            PartName: `/xl/worksheets/${item.fileName}`,
-            ContentType: item.contentType,
-          },
-        });
-        this.relationships.workbook.Relationships.Relationship.push({
-          $: {
-            Id: relationshipId,
-            Type: item.relationType,
-            Target: `worksheets/${item.fileName}`,
-          },
-        });
-        this.document.workbook.workbook.sheets.push({
-          sheet: [
-            {
-              $: {
-                'sheetId': `${item.id}`,
-                'name': item.name,
-                'state': 'visible',
-                'r:id': relationshipId,
-              },
-            },
-          ],
-        });
+        const relationship = new Relationship('worksheet');
 
-        this.relationships.worksheets.push(JSON.parse(JSON.stringify(require('../template/xl/worksheets/_rels/sheet1.xml.rels.json'))));
+        this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
+        this.relationships.workbook.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
+        this.document.workbook.workbook.sheets.push(item.getRelationship(relationship.relationshipId));
+
+        this.relationships.worksheets.push(relationship);
         break;
       }
       case CONTENT_TYPES.drawing: {
-        const relationshipId = `rId${this.relationships.worksheets[item.id - 1].Relationships.Relationship.length + 1}`;
-        item.relationshipId = relationshipId;
-        this.relationships.contentTypes.Types.Override.push({
-          $: {
-            PartName: `/xl/drawings/${item.fileName}`,
-            ContentType: item.contentType,
-          },
-        });
-        // this.document.worksheets[item.id].content.worksheet.drawing = this.document.worksheets[item.id].content.worksheet.drawing || [];
-        this.document.worksheets[item.id - 1].content.worksheet.drawing.push({
-          $: {
-            'r:id': relationshipId,
-          },
-        });
-        this.relationships.worksheets[item.id - 1].Relationships.Relationship.push({
-          $: {
-            Id: relationshipId,
-            Type: item.relationType,
-            Target: `../drawings/${item.fileName}`,
-          },
-        });
-        this.relationships.drawings.push(JSON.parse(JSON.stringify(require('../template/xl/drawings/_rels/drawing1.xml.rels.json'))));
+        const relationship = new Relationship('drawing');
+
+        this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
+        this.relationships.worksheets[item.id - 1].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
+        this.document.worksheets[item.id - 1].content.worksheet.drawing.push(item.getRelationship(relationship.relationshipId));
+
+        this.relationships.drawings.push(relationship);
         break;
       }
       case CONTENT_TYPES.chart: {
-        const relationshipId = `rId${this.relationships.drawings[item.id - 1].Relationships.Relationship.length + 1}`;
+        const relationship = new Relationship('chart');
+
+        const relationshipId = relationship.relationshipId;
         item.relationshipId = relationshipId;
-        this.relationships.contentTypes.Types.Override.push({
-          $: {
-            PartName: `/xl/charts/${item.fileName}`,
-            ContentType: item.contentType,
-          },
-        });
-        this.relationships.drawings[item.id - 1].Relationships.Relationship.push({
-          $: {
-            Id: relationshipId,
-            Type: item.relationType,
-            Target: `../charts/${item.fileName}`,
-          },
-        });
+        this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
+        this.relationships.drawings[item.id - 1].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
+        this.document.drawings[item.id - 1].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationshipId));
       }
     }
   }
@@ -265,7 +209,7 @@ class ExcelFile {
       .folder('_rels')
       .file('workbook.xml.rels', this.xmlBuilder.buildObject(this.relationships.workbook));
 
-    this.relationships.worksheets.forEach((content, index) => {
+    this.relationships.worksheets.forEach(({ content }, index) => {
       const fileName = `sheet${index + 1}.xml.rels`;
       this.zip
         .folder('xl')
@@ -274,7 +218,7 @@ class ExcelFile {
         .file(fileName, this.xmlBuilder.buildObject(content));
     });
 
-    this.relationships.drawings.forEach((content, index) => {
+    this.relationships.drawings.forEach(({ content }, index) => {
       const fileName = `drawing${index + 1}.xml.rels`;
       this.zip
         .folder('xl')

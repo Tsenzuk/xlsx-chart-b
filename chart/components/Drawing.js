@@ -15,7 +15,13 @@ class Drawing {
     drawingCounter++;
   }
 
-
+  getRelationship(relationshipId) {
+    return {
+      $: {
+        'r:id': relationshipId,
+      },
+    };
+  }
 }
 
 module.exports = Drawing;

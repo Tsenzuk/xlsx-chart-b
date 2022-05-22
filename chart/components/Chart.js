@@ -608,6 +608,78 @@ class Chart {
     });
   }
 
+  getRelationship(relationshipId) {
+    const position = Object.assign({
+      fromColumn: 0,
+      fromColumnOffset: 0,
+      fromRow: this.id * 20,
+      fromRowOffset: 0,
+      toColumn: 10,
+      toColumnOffset: 0,
+      toRow: (this.id + 1) * 20,
+      toRowOffset: 0,
+    },
+      this.chartOptions.position
+    );
+
+    return {
+      'xdr:from': {
+        'xdr:col': position.fromColumn,
+        'xdr:colOff': position.fromColumnOffset,
+        'xdr:row': position.fromRow,
+        'xdr:rowOff': position.fromRowOffset,
+      },
+      'xdr:to': {
+        'xdr:col': position.toColumn,
+        'xdr:colOff': position.toColumnOffset,
+        'xdr:row': position.toRow,
+        'xdr:rowOff': position.toRowOffset,
+      },
+      'xdr:graphicFrame': {
+        '$': {
+          macro: '',
+        },
+        'xdr:nvGraphicFramePr': {
+          'xdr:cNvPr': {
+            $: {
+              id: `${this.id + 1}`,
+              name: `Diagram ${this.id}`,
+            },
+          },
+          'xdr:cNvGraphicFramePr': {},
+        },
+        'xdr:xfrm': {
+          'a:off': {
+            $: {
+              x: '0',
+              y: '0',
+            },
+          },
+          'a:ext': {
+            $: {
+              cx: '0',
+              cy: '0',
+            },
+          },
+        },
+        'a:graphic': {
+          'a:graphicData': {
+            '$': {
+              uri: 'http://schemas.openxmlformats.org/drawingml/2006/chart',
+            },
+            'c:chart': {
+              $: {
+                'r:id': relationshipId,
+                'xmlns:c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
+                'xmlns:r': this.relationType,
+              },
+            },
+          },
+        },
+      },
+      'xdr:clientData': {},
+    };
+  }
 }
 
 module.exports = Chart;

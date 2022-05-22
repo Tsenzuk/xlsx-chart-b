@@ -81,6 +81,21 @@ class Worksheet {
       ],
     });
   }
+
+  getRelationship(relationshipId) {
+    return {
+      sheet: [
+        {
+          $: {
+            'sheetId': `${this.id}`,
+            'name': this.name,
+            'state': 'visible',
+            'r:id': relationshipId,
+          },
+        },
+      ],
+    };
+  }
 }
 
 module.exports = Worksheet;
