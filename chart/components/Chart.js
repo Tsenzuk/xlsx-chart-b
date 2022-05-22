@@ -242,7 +242,7 @@ class Chart {
         },
         'c:tx': {
           'c:strRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset}`,
+            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 1}`,
             'c:strCache': {
               'c:ptCount': {
                 $: {
@@ -262,7 +262,7 @@ class Chart {
         ...customColorsSeries,
         'c:cat': {
           'c:strRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(1 + columnOffset)}$${rowOffset + 1}:$${getColName(1 + columnOffset)}$${rowNames.length + rowOffset}`,
+            'c:f': `'${this.dataWorksheetName}'!$${getColName(1 + columnOffset)}$${rowOffset + 2}:$${getColName(1 + columnOffset)}$${rowNames.length + rowOffset + 1}`,
             'c:strCache': {
               'c:ptCount': {
                 $: {
@@ -282,7 +282,7 @@ class Chart {
         },
         'c:val': {
           'c:numRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 1}:$${getColName(columnIndex + 2)}$${rowNames.length + rowOffset}`,
+            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 2}:$${getColName(columnIndex + 2)}$${rowNames.length + rowOffset + 1}`,
             'c:numCache': {
               'c:formatCode': 'General',
               'c:ptCount': {

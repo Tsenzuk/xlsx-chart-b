@@ -85,8 +85,13 @@ class ExcelFile {
         const relationship = new Relationship('chart');
 
         this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
-        this.relationships.drawings[item.id - 1].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
-        this.document.drawings[item.id - 1].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationship.relationshipId));
+        if (this.dataPerSheet) {
+          this.relationships.drawings[item.id - 1].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
+          this.document.drawings[item.id - 1].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationship.relationshipId));
+        } else {
+          this.relationships.drawings[0].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
+          this.document.drawings[0].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationship.relationshipId));
+        }
       }
     }
   }
@@ -124,17 +129,19 @@ class ExcelFile {
         drawing = new Drawing();
         this.document.drawings.push(drawing);
         this.addItem(drawing);
-
-        rowOffset += getRowNames(data).length + 2;
       }
 
       const chart = new Chart('Table', chartConfig);
 
       chart.setChartName(chartTitle);
-      chart.setChartData(data);
+      chart.setChartData(data, rowOffset);
 
       drawing.charts.push(chart);
       this.addItem(chart);
+
+      if (!this.dataPerSheet) {
+        rowOffset += getRowNames(data).length + 2;
+      }
 
     });
   }

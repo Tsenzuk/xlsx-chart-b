@@ -38,48 +38,47 @@ class Worksheet {
 
     const rowNames = getRowNames(data);
 
-    this.content.worksheet.sheetData.push({
-      row: [
+    this.content.worksheet.sheetData.row = this.content.worksheet.sheetData.row || [];
+
+    this.content.worksheet.sheetData.row.push({
+      $: {
+        r: 1 + rowOffset,
+      },
+      c: columnNames.map((columnName, columnIndex) => ({
+        $: {
+          r: `${getColName(columnIndex + 2 + columnOffset)}${1 + rowOffset}`,
+          t: 'str',
+        },
+        v: [
+          columnName,
+        ],
+      })),
+    });
+
+    rowNames.forEach((rowName, rowIndex) => this.content.worksheet.sheetData.row.push({
+      $: {
+        r: rowIndex + 2 + rowOffset,
+      },
+      c: [
         {
           $: {
-            r: 1 + rowOffset,
+            r: `${getColName(1 + columnOffset)}${rowIndex + 2 + rowOffset}`,
+            t: 'str',
           },
-          c: columnNames.map((columnName, columnIndex) => ({
-            $: {
-              r: `${getColName(columnIndex + 2 + columnOffset)}1`,
-              t: 'str',
-            },
-            v: [
-              columnName,
-            ],
-          })),
+          v: [
+            rowName,
+          ],
         },
-        ...rowNames.map((rowName, rowIndex) => ({
+        ...columnNames.map((columnName, columnIndex) => ({
           $: {
-            r: rowIndex + 2 + rowOffset,
+            r: `${getColName(columnIndex + 2 + columnOffset)}${rowIndex + 2 + rowOffset}`,
           },
-          c: [
-            {
-              $: {
-                r: `${getColName(1 + columnOffset)}${rowIndex + 2 + rowOffset}`,
-                t: 'str',
-              },
-              v: [
-                rowName,
-              ],
-            },
-            ...columnNames.map((columnName, columnIndex) => ({
-              $: {
-                r: `${getColName(columnIndex + 2 + columnOffset)}${rowIndex + 2 + rowOffset}`,
-              },
-              v: [
-                data[columnName][rowName] || '',
-              ],
-            })),
+          v: [
+            data[columnName][rowName] || '',
           ],
         })),
       ],
-    });
+    }));
   }
 
   getRelationship(relationshipId) {
