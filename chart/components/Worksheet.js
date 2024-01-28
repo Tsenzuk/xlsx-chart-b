@@ -8,13 +8,14 @@ const RELATION_TYPES = require('../relationTypes');
 let worksheetCounter = 1;
 
 class Worksheet {
-  constructor() {
+  constructor(name) {
     this.contentType = CONTENT_TYPES.worksheet;
     this.relationType = RELATION_TYPES.worksheet;
     this.id = worksheetCounter;
     this.fileName = `sheet${worksheetCounter}.xml`;
     this.name = `${+new Date()}`;
     this.content = JSON.parse(JSON.stringify(require('../../template/xl/worksheets/sheet1.xml.json')));
+    this.name = name;
 
     worksheetCounter++;
   }
@@ -74,7 +75,7 @@ class Worksheet {
             r: `${getColName(columnIndex + 2 + columnOffset)}${rowIndex + 2 + rowOffset}`,
           },
           v: [
-            data[columnName][rowName] || '',
+            data[columnName][rowName].value || '',
           ],
         })),
       ],
@@ -83,16 +84,12 @@ class Worksheet {
 
   getRelationship(relationshipId) {
     return {
-      sheet: [
-        {
-          $: {
-            'sheetId': `${this.id}`,
-            'name': this.name,
-            'state': 'visible',
-            'r:id': relationshipId,
-          },
-        },
-      ],
+      $: {
+        'sheetId': `${this.id}`,
+        'name': this.name,
+        'state': 'visible',
+        'r:id': relationshipId,
+      },
     };
   }
 }

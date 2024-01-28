@@ -1,10 +1,12 @@
 const JSZip = require('jszip');
 const xml2js = require('xml2js');
 
-const { getRowNames } = require('./services');
+const {
+  normalizeOptions,
+  validateOptions,
+} = require('./normalization');
 
 const CONTENT_TYPES = require('./ContentTypes');
-const RELATION_TYPES = require('./relationTypes');
 
 const Worksheet = require('./components/Worksheet');
 const Chart = require('./components/Chart');
@@ -12,14 +14,16 @@ const Drawing = require('./components/Drawing');
 const Relationship = require('./components/Relationship');
 
 /**
- * @typedef {Object} ChartOptions
- * @property {string} type
+ * @typedef {import('../chart').XLSXChartOptions} XLSXChartOptions
  */
 
 class ExcelFile {
+  /**
+   * @param {XLSXChartOptions} options
+   */
   constructor(options) {
     this.zip = new JSZip();
-    // this.xmlBuilder = new xml2js.Builder({ renderOpts: { indent: '', newline: '' } });
+    // this.xmlBuilder = new xml2js.Builder({ renderOpts: { indent: '', newline: '' } }); // use this to disable xml formatting
     this.xmlBuilder = new xml2js.Builder();
 
     this.document = {
@@ -43,16 +47,16 @@ class ExcelFile {
       theme: require('../template/xl/theme/theme1.xml.json'),
     };
 
-    this.options = {
-      type: 'nodebuffer',
-      ...options,
-    };
+    this.options = normalizeOptions(options);
   }
 
-  writeFile() {
-    const { type } = this.options;
+  /**
+   * @param {XLSXChartOptions} options
+   */
+  writeFile(options) {
+    const { type } = options;
 
-    this.fillWorksheets();
+    this.fillWorksheets(options);
 
     this.addFiles();
 
@@ -62,16 +66,18 @@ class ExcelFile {
   addItem(item) {
     switch (item.contentType) {
       case CONTENT_TYPES.worksheet: {
+        this.document.worksheets.push(item);
         const relationship = new Relationship('worksheet');
 
         this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
         this.relationships.workbook.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
-        this.document.workbook.workbook.sheets.push(item.getRelationship(relationship.relationshipId));
+        this.document.workbook.workbook.sheets.sheet.push(item.getRelationship(relationship.relationshipId));
 
         this.relationships.worksheets.push(relationship);
         break;
       }
       case CONTENT_TYPES.drawing: {
+        this.document.drawings.push(item);
         const relationship = new Relationship('drawing');
 
         this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
@@ -85,7 +91,7 @@ class ExcelFile {
         const relationship = new Relationship('chart');
 
         this.relationships.contentTypes.Types.Override.push(relationship.getContentTypes(item.fileName));
-        if (this.dataPerSheet) {
+        if (this.options.dataPerSheet) {
           this.relationships.drawings[item.id - 1].content.Relationships.Relationship.push(relationship.getRelationship(item.fileName));
           this.document.drawings[item.id - 1].content['xdr:wsDr']['xdr:twoCellAnchor'].push(item.getRelationship(relationship.relationshipId));
         } else {
@@ -96,42 +102,53 @@ class ExcelFile {
     }
   }
 
-  fillWorksheets() {
-    let worksheet;
-    let drawing;
+  /**
+   * @param {XLSXChartOptions} options
+   */
+  fillWorksheets(options) {
     let rowOffset = 0;
 
-    if (!this.dataPerSheet) {
-      worksheet = new Worksheet();
-      worksheet.setWorksheetName('Table');
-      this.document.worksheets.push(worksheet);
-      this.addItem(worksheet);
+    if (options.dataPerSheet) {
+      options.charts.forEach((chartConfig) => {
+        const { chartTitle } = chartConfig;
 
-      drawing = new Drawing();
-      this.document.drawings.push(drawing);
-      this.addItem(drawing);
-    }
-
-    this.options.charts.forEach((chartConfig, chartIndex) => {
-      const { data } = chartConfig;
-      let { chartTitle } = chartConfig;
-      chartTitle = chartTitle || `Chart ${chartIndex}`;
-
-      if (this.dataPerSheet) {
-        worksheet = new Worksheet();
-        worksheet.setWorksheetName(chartTitle);
-      }
-      worksheet.setWorksheetData(data, rowOffset);
-      if (this.dataPerSheet) {
-        this.document.worksheets.push(worksheet);
+        const worksheet = new Worksheet(chartTitle);
         this.addItem(worksheet);
 
-        drawing = new Drawing();
-        this.document.drawings.push(drawing);
+        const drawing = new Drawing();
         this.addItem(drawing);
+      });
+    } else {
+      let worksheet = new Worksheet('Charts');
+      this.addItem(worksheet);
+      const drawing = new Drawing();
+      this.addItem(drawing);
+
+      worksheet = new Worksheet('Table');
+      this.addItem(worksheet);
+    }
+
+    options.charts.forEach((chartConfig, chartIndex) => {
+      let worksheet;
+      let drawing;
+
+      const {
+        data,
+        fields,
+        chartTitle,
+      } = chartConfig;
+
+      if (options.dataPerSheet) {
+        worksheet = this.document.worksheets[chartIndex];
+        drawing = this.document.drawings[chartIndex];
+      } else {
+        worksheet = this.document.worksheets[1]; // the second worksheet is for data
+        drawing = this.document.drawings[0]; // the single drawing is for all charts
       }
 
-      const chart = new Chart('Table', chartConfig);
+      worksheet.setWorksheetData(data, rowOffset);
+
+      const chart = new Chart(worksheet.name, chartConfig);
 
       chart.setChartName(chartTitle);
       chart.setChartData(data, rowOffset);
@@ -139,47 +156,9 @@ class ExcelFile {
       drawing.charts.push(chart);
       this.addItem(chart);
 
-      if (!this.dataPerSheet) {
-        rowOffset += getRowNames(data).length + 2;
+      if (options.dataPerSheet) {
+        rowOffset += fields.length + 2; // +2 for header and empty row
       }
-
-    });
-  }
-
-  fillWorkbook() {
-    // write worksheets
-    this.document.worksheets.forEach((worksheet, sheetIndex) => {
-      worksheet.relationshipId = `rId${this.relationships.workbook.Relationships.Relationship.length + 1}`;
-
-      this.relationships.contentTypes.Types.Override.push({
-        $: {
-          PartName: `/xl/worksheets/${worksheet.fileName}`,
-          ContentType: CONTENT_TYPES.worksheet,
-        },
-      });
-
-      const relationshipId = `rId${this.relationships.workbook.Relationships.Relationship.length + 1}`;
-
-      this.relationships.workbook.Relationships.Relationship.push({
-        $: {
-          Id: relationshipId,
-          Type: RELATION_TYPES.worksheet,
-          Target: `worksheets/${worksheet.fileName}`,
-        },
-      });
-
-      this.document.workbook.workbook.sheets.push({
-        sheet: [
-          {
-            $: {
-              'sheetId': `${worksheet.id}`,
-              'name': this.document.worksheets[sheetIndex].name,
-              'state': 'visible',
-              'r:id': relationshipId,
-            },
-          },
-        ],
-      });
     });
   }
 
@@ -242,51 +221,23 @@ class ExcelFile {
     this.zip.folder('xl').folder('theme').file('theme1.xml', this.xmlBuilder.buildObject(this.metadata.theme));
   }
 
-  validateOptions() {
-    const {
-      type,
-      charts,
-    } = this.options;
-
-    const errors = [];
-
-    if (typeof type !== 'string') {
-      errors.push(new Error(`options.type should be string or missing, passed: ${type}`));
-    }
-    if (!Array.isArray(charts)) {
-      errors.push(new Error(`options.charts should be array, passed: ${charts}`));
-    }
-
-    charts?.forEach((chart, index) => {
-      if (!chart.data || typeof chart.data !== 'object') {
-        errors.push(new Error(`each options.charts[${index}].data should contain object, passed: ${chart.data}`));
-      }
-      if (chart.data && Object.values(chart.data).some((subData) => typeof subData !== 'object')) {
-        errors.push(new Error(`each options.charts[${index}].data[title] should contain object`));
-      }
-    });
-
-    return errors.length ? errors : null;
-  }
-
   /**
    *
-   * @param {ChartOptions} options
+   * @param {XLSXChartOptions} options
    */
   generate(options) {
-    this.options = {
-      type: 'nodebuffer',
-      ...this.options,
-      ...options,
-    };
+    // option normalization, as it could be done in constructor
+    if (options) {
+      this.options = normalizeOptions(options);
+    }
 
-    const errors = this.validateOptions();
+    const errors = validateOptions(this.options);
 
     if (errors) {
       return Promise.reject(errors);
     }
 
-    return this.writeFile();
+    return this.writeFile(this.options);
   }
 }
 

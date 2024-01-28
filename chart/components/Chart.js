@@ -295,7 +295,7 @@ class Chart {
                   '$': {
                     idx: rowIndex,
                   },
-                  'c:v': columnData[rowName],
+                  'c:v': columnData[rowName].value,
                 };
               }),
             },
