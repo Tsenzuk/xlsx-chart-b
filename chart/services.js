@@ -13,6 +13,12 @@ function getColName(n) {
   return getColName(Math.floor(n / 26)) + abc[n % 26];
 }
 
+function getRowNames (data) {
+  const rowNames = [...new Set(Object.values(data).reduce((memo, columnData) => memo.concat(...Object.keys(columnData)), []))];
+  return rowNames;
+}
+
 module.exports = {
   getColName,
+  getRowNames,
 };

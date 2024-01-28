@@ -17,7 +17,7 @@
         }
       }
     ],
-    "sheetData": [],
+    "sheetData": {},
     "pageMargins": [
       {
         "$": {
@@ -41,6 +41,7 @@
           "fitToHeight": "1"
         }
       }
-    ]
+    ],
+    "drawing": []
   }
 }
