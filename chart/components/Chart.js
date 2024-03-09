@@ -103,7 +103,7 @@ class Chart {
             'a:r': {
               'a:rPr': {
                 $: {
-                  lang: 'ru-RU',
+                  lang: 'en-US',
                 },
               },
               'a:t': title,
@@ -433,8 +433,9 @@ class Chart {
       newChart['c:ser'] = ser;
 
       if (chart === 'column' || chart === 'bar' || chart === 'line' || chart === 'area' || chart === 'scatter') {
-        if (!this.y1Axis) {
-          this.y1Axis = {
+        if (!this.xAxis) {
+          this.xAxis = {
+            'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
             'c:axId': {
               $: {
                 val: Math.floor(Math.random() * 100000000),
@@ -450,7 +451,7 @@ class Chart {
 
             'c:axPos': {
               $: {
-                val: 'l',
+                val: 'b',
               },
             },
             'c:tickLblPos': {
@@ -486,14 +487,15 @@ class Chart {
           };
 
           this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] || [];
-          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'].push(this.y1Axis);
+          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'].push(this.xAxis);
         }
 
-        if (!this.xAxis) {
-          this.xAxis = {
+        if (!this.y1Axis) {
+          this.y1Axis = {
+            'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
             'c:axId': {
               $: {
-                val: this.y1Axis['c:crossAx']['$'].val,
+                val: this.xAxis['c:crossAx']['$'].val,
               },
             },
             'c:scaling': {
@@ -505,7 +507,7 @@ class Chart {
             },
             'c:axPos': {
               $: {
-                val: 'b',
+                val: 'l',
               },
             },
             'c:majorGridlines': {},
@@ -523,7 +525,7 @@ class Chart {
             },
             'c:crossAx': {
               $: {
-                val: this.y1Axis['c:axId']['$'].val,
+                val: this.xAxis['c:axId']['$'].val,
               },
             },
             'c:crosses': {
@@ -539,18 +541,18 @@ class Chart {
           };
 
           this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] || [];
-          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'].push(this.xAxis);
+          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'].push(this.y1Axis);
         }
 
         newChart['c:axId'] = [
           {
             $: {
-              val: this.y1Axis['c:axId']['$'].val,
+              val: this.xAxis['c:axId']['$'].val,
             },
           },
           {
             $: {
-              val: this.xAxis['c:axId']['$'].val,
+              val: this.y1Axis['c:axId']['$'].val,
             },
           },
         ];
