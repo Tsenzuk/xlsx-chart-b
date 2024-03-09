@@ -103,7 +103,7 @@ class Chart {
             'a:r': {
               'a:rPr': {
                 $: {
-                  lang: 'ru-RU',
+                  lang: 'en-US',
                 },
               },
               'a:t': title,
