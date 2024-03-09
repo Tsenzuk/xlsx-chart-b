@@ -435,6 +435,7 @@ class Chart {
       if (chart === 'column' || chart === 'bar' || chart === 'line' || chart === 'area' || chart === 'scatter') {
         if (!this.xAxis) {
           this.xAxis = {
+            'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
             'c:axId': {
               $: {
                 val: Math.floor(Math.random() * 100000000),
@@ -491,6 +492,7 @@ class Chart {
 
         if (!this.y1Axis) {
           this.y1Axis = {
+            'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
             'c:axId': {
               $: {
                 val: this.xAxis['c:crossAx']['$'].val,
