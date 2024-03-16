@@ -106,6 +106,7 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
   returnOptions[titlesField] = titles;
   returnOptions[fieldsField] = fields;
   returnOptions.position = chartOptions.position;
+  returnOptions.majorGridlines = chartOptions.majorGridlines ?? true;
 
   // service options, used for
   returnOptions.titlesField = titlesField;

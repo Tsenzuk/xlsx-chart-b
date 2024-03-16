@@ -404,6 +404,10 @@ class Chart {
 
           this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] || [];
           this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'].push(this.y1Axis);
+
+          if (chartConfig.majorGridlines) {
+            this.y1Axis['c:majorGridlines'] = {};
+          }
         }
 
         newChart['c:axId'] = [
