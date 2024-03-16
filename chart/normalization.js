@@ -2,6 +2,7 @@ const DEFAULT_EXPORT_TYPE = 'nodebuffer';
 const DEFAULT_CHART_TYPE = 'column';
 const DEFAULT_TITLES_FIELD = 'titles';
 const DEFAULT_FIELDS_FIELD = 'fields';
+const DEFAULT_CHART_TYPE_FIELD = 'chart';
 const DEFAULT_LINE_COLOR_FIELD = 'lineColor';
 const DEFAULT_FILL_COLOR_FIELD = 'fillColor';
 const DEFAULT_MARKER_COLOR_FIELD = 'markerColor';
@@ -24,6 +25,7 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
 
   const titlesField = chartOptions.titlesField || DEFAULT_TITLES_FIELD;
   const fieldsField = chartOptions.fieldsField || DEFAULT_FIELDS_FIELD;
+  const chartTypeField = chartOptions.chartTypeField || DEFAULT_CHART_TYPE_FIELD;
   const lineColorField = chartOptions.lineColorField || DEFAULT_LINE_COLOR_FIELD;
   const fillColorField = chartOptions.fillColorField || DEFAULT_FILL_COLOR_FIELD;
   const markerColorField = chartOptions.markerColorField || DEFAULT_MARKER_COLOR_FIELD;
@@ -80,6 +82,10 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
           markerColor,
         };
       }
+    }
+
+    if (chartOptions[titlesField] && chartOptions.data[title][chartTypeField]) {
+      data[title][chartTypeField] = chartOptions.data[title][chartTypeField];
     }
 
     if (chartOptions.customColors?.series?.[title]) {
@@ -190,6 +196,7 @@ module.exports = {
   validateOptions,
   DEFAULT_TITLES_FIELD,
   DEFAULT_FIELDS_FIELD,
+  DEFAULT_CHART_TYPE_FIELD,
   DEFAULT_LINE_COLOR_FIELD,
   DEFAULT_FILL_COLOR_FIELD,
   DEFAULT_MARKER_COLOR_FIELD,

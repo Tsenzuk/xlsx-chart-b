@@ -6,6 +6,7 @@ const RELATION_TYPES = require('../relationTypes');
 const {
   DEFAULT_TITLES_FIELD,
   DEFAULT_FIELDS_FIELD,
+  DEFAULT_CHART_TYPE_FIELD,
   DEFAULT_LINE_COLOR_FIELD,
   DEFAULT_FILL_COLOR_FIELD,
   DEFAULT_MARKER_COLOR_FIELD,
@@ -60,6 +61,7 @@ class Chart {
     this.chartOptions = Object.assign({}, DEFAULT_CHART_OPTIONS, chartOptions);
     this.titlesField = this.chartOptions.titlesField || DEFAULT_TITLES_FIELD;
     this.fieldsField = this.chartOptions.fieldsField || DEFAULT_FIELDS_FIELD;
+    this.chartTypeField = this.chartOptions.chartTypeField || DEFAULT_CHART_TYPE_FIELD;
     this.lineColorField = this.chartOptions.lineColorField || DEFAULT_LINE_COLOR_FIELD;
     this.fillColorField = this.chartOptions.fillColorField || DEFAULT_FILL_COLOR_FIELD;
     this.markerColorField = this.chartOptions.markerColorField || DEFAULT_MARKER_COLOR_FIELD;
@@ -113,13 +115,15 @@ class Chart {
     // it is needed to gather all series of the same type and grouping together as single chart layer
     const seriesByChart = chartConfig[this.titlesField].reduce((seriesByChart, columnName, columnIndex) => {
       const columnData = chartConfig.data[columnName];
-      const chart = columnData.chart || this.chartOptions.chart;
+      const chart = columnData[this.chartTypeField] || this.chartOptions.chart;
       const grouping = columnData.grouping || this.chartOptions.grouping || CHART_GROUPING_BY_CHART_NAME[chart];
 
       const customColorsPoints = {
         'c:dPt': [],
       };
-      const customColorsSeries = {};
+      const customColorsSeries = {
+        'c:spPr': {},
+      };
 
       customColorsPoints['c:dPt'] = chartConfig[this.fieldsField].map((field, i) => {
         const fillColor = chartConfig.data[columnName][field][this.fillColorField];
@@ -128,6 +132,7 @@ class Chart {
 
         const dataPointConfig = {
           'c:idx': { $: { val: i } },
+          'c:spPr': {},
         };
 
         if (!fillColor || !lineColor || !markerColor) {
@@ -143,49 +148,52 @@ class Chart {
           return dataPointConfig;
         }
 
-        dataPointConfig['c:spPr'] = {
-          'a:solidFill': {
+        if (fillColor) {
+          dataPointConfig['c:spPr']['a:solidFill'] = {
             'a:srgbClr': { $: { val: fillColor } },
-          },
-          'a:ln': {
+          };
+        }
+
+        if (lineColor) {
+          dataPointConfig['c:spPr']['a:ln'] = {
             'a:solidFill': {
               'a:srgbClr': { $: { val: lineColor } },
             },
-          },
-          'c:marker': {
+          };
+        }
+
+        if (markerColor) {
+          dataPointConfig['c:spPr']['c:marker'] = {
             'c:spPr': {
               'a:solidFill': {
                 'a:srgbClr': { $: { val: markerColor } },
               },
             },
-          },
-        };
+          };
+        }
 
         return dataPointConfig;
       }).filter(Boolean);
 
-      if (chartConfig.data[columnName][this.fillColorField]
-        || chartConfig.data[columnName][this.lineColorField]
-        || chartConfig.data[columnName][this.markerColorField]
-      ) {
-        const fillColor = chartConfig.data[columnName][this.fillColorField];
-        const lineColor = chartConfig.data[columnName][this.lineColorField];
-        const markerColor = chartConfig.data[columnName][this.markerColorField];
+      if (chartConfig.data[columnName][this.fillColorField]) {
+        customColorsSeries['c:spPr']['a:solidFill'] = {
+          'a:srgbClr': { $: { val: chartConfig.data[columnName][this.fillColorField] } },
+        };
+      }
 
-        customColorsSeries['c:spPr'] = {
+      if (chartConfig.data[columnName][this.lineColorField]) {
+        customColorsSeries['c:spPr']['a:ln'] = {
           'a:solidFill': {
-            'a:srgbClr': { $: { val: fillColor } },
+            'a:srgbClr': { $: { val: chartConfig.data[columnName][this.lineColorField] } },
           },
-          'a:ln': {
+        };
+      }
+
+      if (chartConfig.data[columnName][this.markerColorField]) {
+        customColorsSeries['c:spPr']['c:marker'] = {
+          'c:spPr': {
             'a:solidFill': {
-              'a:srgbClr': { $: { val: lineColor } },
-            },
-          },
-          'c:marker': {
-            'c:spPr': {
-              'a:solidFill': {
-                'a:srgbClr': { $: { val: markerColor } },
-              },
+              'a:srgbClr': { $: { val: chartConfig.data[columnName][this.markerColorField] } },
             },
           },
         };
@@ -319,6 +327,7 @@ class Chart {
       } else if (chart == 'line' || chart == 'area' || chart == 'radar' || chart == 'scatter') {
         // newChart = _.clone (me.chartTemplate ['c:chartSpace']['c:chart']['c:plotArea'][templateChartName]);
         // delete newChart['c:barDir'];
+        newChart['c:marker'] = { $: { val: 1 } };
       } else {
         newChart['c:varyColors'] = {
           $: {
@@ -327,6 +336,7 @@ class Chart {
         };
 
         newChart['c:ser'] = ser;
+
         if (this.chartOptions.firstSliceAng) {
           newChart['c:firstSliceAng'] = {
             $: {
@@ -334,6 +344,7 @@ class Chart {
             },
           };
         }
+
         if (this.chartOptions.holeSize) {
           newChart['c:holeSize'] = {
             $: {
