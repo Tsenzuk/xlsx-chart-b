@@ -29,6 +29,18 @@ const emptyCallBack = (...args) => args;
  */
 
 /**
+ * @typedef {number} DataPointValue
+ */
+
+/**
+ * @typedef {object} Position
+ * @property {number} fromColumn - start column
+ * @property {number} fromRow - start row
+ * @property {number?} toColumn - end column
+ * @property {number?} toRow - end row
+ */
+
+/**
  * @description Value of data point
  * @typedef {object} DataPoint
  * @property {DataPointValue} value - value of data point
@@ -40,7 +52,10 @@ const emptyCallBack = (...args) => args;
 /**
  * @description Data series of chart
  * @typedef ChartData
- * @type {object.<DataSeriesName, object.<DataPointName, DataPoint>>}
+ * @type {object.<DataSeriesName, object.<DataPointName, DataPoint | DataPointValue>>}
+ * @property {string?} [fillColor] - color of series fill
+ * @property {string?} [lineColor] - color of series line
+ * @property {string?} [markerColor] - color of series marker
  */
 
 /**
@@ -51,7 +66,7 @@ const emptyCallBack = (...args) => args;
 
 /**
  * @typedef {object} ChartOptions
- * @property {string} chartTitle - title of chart
+ * @property {string?} chartTitle - title of chart
  * @property {string} chart - type of chart
  * @property {ChartData} data - data for chart
  * @property {Position?} position - position of chart

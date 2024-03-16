@@ -105,6 +105,7 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
   returnOptions.data = data;
   returnOptions[titlesField] = titles;
   returnOptions[fieldsField] = fields;
+  returnOptions.position = chartOptions.position;
 
   // service options, used for
   returnOptions.titlesField = titlesField;
