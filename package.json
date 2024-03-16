@@ -15,10 +15,10 @@
   "license": "ISC",
   "dependencies": {
     "jszip": "^3.7.1",
-    "lodash": "^4.17.21",
     "xml2js": "^0.4.23"
   },
   "devDependencies": {
-    "eslint": "^8.6.0"
+    "eslint": "^8.6.0",
+    "lodash": "^4.17.21"
   }
 }

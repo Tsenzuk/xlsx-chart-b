@@ -1,5 +1,10 @@
 const DEFAULT_EXPORT_TYPE = 'nodebuffer';
 const DEFAULT_CHART_TYPE = 'column';
+const DEFAULT_TITLES_FIELD = 'titles';
+const DEFAULT_FIELDS_FIELD = 'fields';
+const DEFAULT_LINE_COLOR_FIELD = 'lineColor';
+const DEFAULT_FILL_COLOR_FIELD = 'fillColor';
+const DEFAULT_MARKER_COLOR_FIELD = 'markerColor';
 
 /**
  * @typedef {import('../chart').XLSXChartOptions} XLSXChartOptions
@@ -17,12 +22,22 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
   returnOptions.chartTitle = chartOptions.chartTitle || `Chart ${chartIndex}`;
   returnOptions.chart = chartOptions.chart || DEFAULT_CHART_TYPE;
 
-  const titles = chartOptions.titles || [];
-  const fields = chartOptions.fields || [];
+  const titlesField = chartOptions.titlesField || DEFAULT_TITLES_FIELD;
+  const fieldsField = chartOptions.fieldsField || DEFAULT_FIELDS_FIELD;
+  const lineColorField = chartOptions.lineColorField || DEFAULT_LINE_COLOR_FIELD;
+  const fillColorField = chartOptions.fillColorField || DEFAULT_FILL_COLOR_FIELD;
+  const markerColorField = chartOptions.markerColorField || DEFAULT_MARKER_COLOR_FIELD;
+
+  const titles = chartOptions[titlesField] || [];
+  const fields = chartOptions[fieldsField] || [];
   const data = {};
 
   // TODO: make the code asynchronous to avoid blocking if there are many charts or data points
   for (const title in chartOptions.data) {
+    if (chartOptions[titlesField] && !chartOptions[titlesField].includes(title)) {
+      continue; // if user provided titles, skip the ones that are not in the list
+    }
+
     if (!titles.includes(title)) {
       titles.push(title);
     }
@@ -30,6 +45,10 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
     data[title] = {};
 
     for (const field in chartOptions.data[title]) {
+      if (chartOptions[fieldsField] && !chartOptions[fieldsField].includes(field)) {
+        continue; // if user provided fields, skip the ones that are not in the list
+      }
+
       if (!fields.includes(field)) {
         fields.push(field);
       }
@@ -39,14 +58,60 @@ const normalizeChartOptions = (chartOptions, chartIndex) => {
       if (typeof point === 'object') {
         data[title][field] = point;
       } else {
-        data[title][field] = { value: point };
+        const colorConfig = chartOptions.customColors?.points?.[title]?.[field] || null;
+        let fillColor = null;
+        let lineColor = null;
+        let markerColor = null;
+
+        if (typeof colorConfig === 'string') {
+          fillColor = colorConfig;
+          lineColor = colorConfig;
+          markerColor = colorConfig;
+        } else if (colorConfig && typeof colorConfig === 'object') {
+          fillColor = colorConfig.fill || fillColor;
+          lineColor = colorConfig.line || lineColor;
+          markerColor = colorConfig.marker || markerColor;
+        }
+
+        data[title][field] = {
+          value: point,
+          fillColor,
+          lineColor,
+          markerColor,
+        };
       }
+    }
+
+    if (chartOptions.customColors?.series?.[title]) {
+      const colorConfig = chartOptions.customColors.series[title];
+
+      if (!colorConfig) {
+        continue;
+      }
+
+      if (typeof colorConfig === 'string') {
+        data[title][fillColorField] = colorConfig;
+        data[title][lineColorField] = colorConfig;
+        data[title][markerColorField] = colorConfig;
+        continue;
+      }
+
+      data[title][fillColorField] = colorConfig.fill || data[title][fillColorField];
+      data[title][lineColorField] = colorConfig.line || data[title][lineColorField];
+      data[title][markerColorField] = colorConfig.marker || data[title][markerColorField];
     }
   }
 
   returnOptions.data = data;
-  returnOptions.titles = titles;
-  returnOptions.fields = fields;
+  returnOptions[titlesField] = titles;
+  returnOptions[fieldsField] = fields;
+
+  // service options, used for
+  returnOptions.titlesField = titlesField;
+  returnOptions.fieldsField = fieldsField;
+  returnOptions.lineColorField = lineColorField;
+  returnOptions.fillColorField = fillColorField;
+  returnOptions.markerColorField = markerColorField;
 
   return returnOptions;
 };
@@ -68,11 +133,11 @@ const normalizeOptions = (options) => {
   // single-chart config
   if (options.data) {
     console.warn('@deprecated Single chart config using options.data is deprecated, use options.charts[] instead');
-    returnOptions.charts.push({
+    returnOptions.charts.push(normalizeChartOptions({
       data: this.options.data,
       chartTitle: this.options.chartTitle,
       chart: this.options.chart,
-    });
+    }, 0));
   }
 
   if (options.charts && options.charts.length) {
@@ -121,4 +186,9 @@ const validateOptions = (options) => {
 module.exports = {
   normalizeOptions,
   validateOptions,
+  DEFAULT_TITLES_FIELD,
+  DEFAULT_FIELDS_FIELD,
+  DEFAULT_LINE_COLOR_FIELD,
+  DEFAULT_FILL_COLOR_FIELD,
+  DEFAULT_MARKER_COLOR_FIELD,
 };

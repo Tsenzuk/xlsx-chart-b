@@ -1,6 +1,5 @@
 const {
   getColName,
-  getRowNames,
 } = require('../services');
 const CONTENT_TYPES = require('../ContentTypes');
 const RELATION_TYPES = require('../relationTypes');
@@ -30,14 +29,11 @@ class Worksheet {
 
   /**
    *
-   * @param {Object.<string, Object.<string, number|string>>} data
+   * @param {{ titles: string[], fields: string[], data: Object.<string, Object.<string, number|string>> }} chartConfig
    */
-  setWorksheetData(data, rowOffset = 0, columnOffset = 0) {
+  setWorksheetData(chartConfig, rowOffset = 0, columnOffset = 0) {
+    const data = chartConfig.data;
     this._data = data;
-
-    const columnNames = Object.keys(data);
-
-    const rowNames = getRowNames(data);
 
     this.content.worksheet.sheetData.row = this.content.worksheet.sheetData.row || [];
 
@@ -45,7 +41,7 @@ class Worksheet {
       $: {
         r: 1 + rowOffset,
       },
-      c: columnNames.map((columnName, columnIndex) => ({
+      c: chartConfig[chartConfig.titlesField].map((columnName, columnIndex) => ({
         $: {
           r: `${getColName(columnIndex + 2 + columnOffset)}${1 + rowOffset}`,
           t: 'str',
@@ -56,7 +52,7 @@ class Worksheet {
       })),
     });
 
-    rowNames.forEach((rowName, rowIndex) => this.content.worksheet.sheetData.row.push({
+    chartConfig[chartConfig.fieldsField].forEach((rowName, rowIndex) => this.content.worksheet.sheetData.row.push({
       $: {
         r: rowIndex + 2 + rowOffset,
       },
@@ -70,7 +66,7 @@ class Worksheet {
             rowName,
           ],
         },
-        ...columnNames.map((columnName, columnIndex) => ({
+        ...chartConfig[chartConfig.titlesField].map((columnName, columnIndex) => ({
           $: {
             r: `${getColName(columnIndex + 2 + columnOffset)}${rowIndex + 2 + rowOffset}`,
           },

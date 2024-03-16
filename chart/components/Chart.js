@@ -1,10 +1,15 @@
-const _ = require('lodash');
 const {
   getColName,
-  getRowNames,
 } = require('../services');
 const CONTENT_TYPES = require('../ContentTypes');
 const RELATION_TYPES = require('../relationTypes');
+const {
+  DEFAULT_TITLES_FIELD,
+  DEFAULT_FIELDS_FIELD,
+  DEFAULT_LINE_COLOR_FIELD,
+  DEFAULT_FILL_COLOR_FIELD,
+  DEFAULT_MARKER_COLOR_FIELD,
+} = require('../normalization');
 
 const CHART_TAG_BY_CHART_NAME = {
   bar: 'c:barChart',
@@ -41,6 +46,8 @@ const DEFAULT_CHART_OPTIONS = {
   manualLayout: null,
 };
 
+const DELIMITER = '\r\r';
+
 let chartCounter = 1;
 
 class Chart {
@@ -51,6 +58,11 @@ class Chart {
     this.fileName = `chart${chartCounter}.xml`;
     this.dataWorksheetName = dataWorksheetName;
     this.chartOptions = Object.assign({}, DEFAULT_CHART_OPTIONS, chartOptions);
+    this.titlesField = this.chartOptions.titlesField || DEFAULT_TITLES_FIELD;
+    this.fieldsField = this.chartOptions.fieldsField || DEFAULT_FIELDS_FIELD;
+    this.lineColorField = this.chartOptions.lineColorField || DEFAULT_LINE_COLOR_FIELD;
+    this.fillColorField = this.chartOptions.fillColorField || DEFAULT_FILL_COLOR_FIELD;
+    this.markerColorField = this.chartOptions.markerColorField || DEFAULT_MARKER_COLOR_FIELD;
 
     this.name = `${+new Date()}`;
     this.content = JSON.parse(JSON.stringify(require('../../template/xl/charts/chart1.xml.json')));
@@ -68,26 +80,10 @@ class Chart {
 
     if (titlePosition) {
       layout['c:manualLayout'] = {
-        'c:xMode': {
-          $: {
-            val: 'edge',
-          },
-        },
-        'c:yMode': {
-          $: {
-            val: 'edge',
-          },
-        },
-        'c:x': {
-          $: {
-            val: titlePosition.x,
-          },
-        },
-        'c:y': {
-          $: {
-            val: titlePosition.y,
-          },
-        },
+        'c:xMode': { $: { val: 'edge' } },
+        'c:yMode': { $: { val: 'edge' } },
+        'c:x': { $: { val: titlePosition.x } },
+        'c:y': { $: { val: titlePosition.y } },
       };
     }
 
@@ -101,154 +97,108 @@ class Chart {
               'a:defRPr': {},
             },
             'a:r': {
-              'a:rPr': {
-                $: {
-                  lang: 'en-US',
-                },
-              },
+              'a:rPr': { $: { lang: 'en-US' } },
               'a:t': title,
             },
           },
         },
       },
       'c:layout': layout,
-      'c:overlay': {
-        $: {
-          val: '0',
-        },
-      },
+      'c:overlay': { $: { val: '0' } },
     };
   }
 
-  setChartData(data, rowOffset = 0, columnOffset = 0) {
-    const seriesByChart = Object.entries(data).reduce((seriesByChart, [columnName, columnData], columnIndex) => {
+  setChartData(chartConfig, rowOffset = 0, columnOffset = 0) {
+    // Group series by chart type and grouping
+    // it is needed to gather all series of the same type and grouping together as single chart layer
+    const seriesByChart = chartConfig[this.titlesField].reduce((seriesByChart, columnName, columnIndex) => {
+      const columnData = chartConfig.data[columnName];
       const chart = columnData.chart || this.chartOptions.chart;
       const grouping = columnData.grouping || this.chartOptions.grouping || CHART_GROUPING_BY_CHART_NAME[chart];
-
-      const rowNames = getRowNames(data);
 
       const customColorsPoints = {
         'c:dPt': [],
       };
       const customColorsSeries = {};
 
-      if (this.chartOptions.customColors) {
-        const customColors = this.chartOptions.customColors;
+      customColorsPoints['c:dPt'] = chartConfig[this.fieldsField].map((field, i) => {
+        const fillColor = chartConfig.data[columnName][field][this.fillColorField];
+        const lineColor = chartConfig.data[columnName][field][this.lineColorField];
+        const markerColor = chartConfig.data[columnName][field][this.markerColorField];
 
-        if (customColors.points) {
-          customColorsPoints['c:dPt'] = rowNames.map((field, i) => {
-            const color = _.chain(customColors).get('points').get(columnName).get(field, null).value();
+        const dataPointConfig = {
+          'c:idx': { $: { val: i } },
+        };
 
-            if (!color) {
-              return null;
-            }
-            if (color === 'noFill') {
-              return {
-                'c:idx': {
-                  $: {
-                    val: i,
-                  },
-                },
-                'c:spPr': {
-                  'a:noFill': '',
-                },
-              };
-            }
-            let fillColor = color;
-            let lineColor = color;
-            if (typeof color === 'object') {
-              fillColor = color.fill;
-              lineColor = color.line;
-            }
-            return {
-              'c:idx': {
-                $: {
-                  val: i,
-                },
-              },
-              'c:spPr': {
-                'a:solidFill': {
-                  'a:srgbClr': {
-                    $: {
-                      val: fillColor,
-                    },
-                  },
-                },
-                'a:ln': {
-                  'a:solidFill': {
-                    'a:srgbClr': {
-                      $: {
-                        val: lineColor,
-                      },
-                    },
-                  },
-                },
-              },
-            };
-          }).filter(Boolean);
+        if (!fillColor || !lineColor || !markerColor) {
+          return null;
         }
 
-        if (customColors.series && customColors.series[columnName]) {
-          let fillColor = customColors.series[columnName];
-          let lineColor = customColors.series[columnName];
-          let markerColor = customColors.series[columnName];
-          if (typeof customColors.series === 'object') {
-            fillColor = customColors.series[columnName].fill;
-            lineColor = customColors.series[columnName].line;
-            markerColor = customColors.series[columnName].marker;
-          }
-          customColorsSeries['c:spPr'] = {
-            'a:solidFill': {
-              'a:srgbClr': {
-                $: {
-                  val: fillColor,
-                },
-              },
-            },
-            'a:ln': {
-              'a:solidFill': {
-                'a:srgbClr': {
-                  $: {
-                    val: lineColor,
-                  },
-                },
-              },
-            },
-            'c:marker': {
-              'c:spPr': {
-                'a:solidFill': {
-                  'a:srgbClr': {
-                    $: {
-                      val: markerColor,
-                    },
-                  },
-                },
-              },
-            },
+
+        if (fillColor === 'noFill' && lineColor === 'noFill' && markerColor === 'noFill') {
+          dataPointConfig['c:spPr'] = {
+            'a:noFill': '',
           };
+
+          return dataPointConfig;
         }
+
+        dataPointConfig['c:spPr'] = {
+          'a:solidFill': {
+            'a:srgbClr': { $: { val: fillColor } },
+          },
+          'a:ln': {
+            'a:solidFill': {
+              'a:srgbClr': { $: { val: lineColor } },
+            },
+          },
+          'c:marker': {
+            'c:spPr': {
+              'a:solidFill': {
+                'a:srgbClr': { $: { val: markerColor } },
+              },
+            },
+          },
+        };
+
+        return dataPointConfig;
+      }).filter(Boolean);
+
+      if (chartConfig.data[columnName][this.fillColorField]
+        || chartConfig.data[columnName][this.lineColorField]
+        || chartConfig.data[columnName][this.markerColorField]
+      ) {
+        const fillColor = chartConfig.data[columnName][this.fillColorField];
+        const lineColor = chartConfig.data[columnName][this.lineColorField];
+        const markerColor = chartConfig.data[columnName][this.markerColorField];
+
+        customColorsSeries['c:spPr'] = {
+          'a:solidFill': {
+            'a:srgbClr': { $: { val: fillColor } },
+          },
+          'a:ln': {
+            'a:solidFill': {
+              'a:srgbClr': { $: { val: lineColor } },
+            },
+          },
+          'c:marker': {
+            'c:spPr': {
+              'a:solidFill': {
+                'a:srgbClr': { $: { val: markerColor } },
+              },
+            },
+          },
+        };
       }
 
       const ser = {
-        'c:idx': {
-          $: {
-            val: columnIndex,
-          },
-        },
-        'c:order': {
-          $: {
-            val: columnIndex,
-          },
-        },
+        'c:idx': { $: { val: columnIndex } },
+        'c:order': { $: { val: columnIndex } },
         'c:tx': {
           'c:strRef': {
             'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 1}`,
             'c:strCache': {
-              'c:ptCount': {
-                $: {
-                  val: 1,
-                },
-              },
+              'c:ptCount': { $: { val: 1 } },
               'c:pt': {
                 '$': {
                   idx: 0,
@@ -262,14 +212,10 @@ class Chart {
         ...customColorsSeries,
         'c:cat': {
           'c:strRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(1 + columnOffset)}$${rowOffset + 2}:$${getColName(1 + columnOffset)}$${rowNames.length + rowOffset + 1}`,
+            'c:f': `'${this.dataWorksheetName}'!$${getColName(1 + columnOffset)}$${rowOffset + 2}:$${getColName(1 + columnOffset)}$${chartConfig[this.fieldsField].length + rowOffset + 1}`,
             'c:strCache': {
-              'c:ptCount': {
-                $: {
-                  val: rowNames.length,
-                },
-              },
-              'c:pt': rowNames.map((rowName, rowIndex) => {
+              'c:ptCount': { $: { val: chartConfig[this.fieldsField].length } },
+              'c:pt': chartConfig[this.fieldsField].map((rowName, rowIndex) => {
                 return {
                   '$': {
                     idx: rowIndex,
@@ -282,15 +228,11 @@ class Chart {
         },
         'c:val': {
           'c:numRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 2}:$${getColName(columnIndex + 2)}$${rowNames.length + rowOffset + 1}`,
+            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 2}:$${getColName(columnIndex + 2)}$${chartConfig[this.fieldsField].length + rowOffset + 1}`,
             'c:numCache': {
               'c:formatCode': 'General',
-              'c:ptCount': {
-                $: {
-                  val: rowNames.length,
-                },
-              },
-              'c:pt': rowNames.map((rowName, rowIndex) => {
+              'c:ptCount': { $: { val: chartConfig[this.fieldsField].length } },
+              'c:pt': chartConfig[this.fieldsField].map((rowName, rowIndex) => {
                 return {
                   '$': {
                     idx: rowIndex,
@@ -318,7 +260,7 @@ class Chart {
         };
       }
 
-      const seriesKey = `${chart}\r\r${grouping}`;
+      const seriesKey = `${chart}${DELIMITER}${grouping}`;
       seriesByChart[seriesKey] = seriesByChart[seriesKey] || [];
       seriesByChart[seriesKey].push(ser);
 
@@ -327,7 +269,7 @@ class Chart {
 
 
     Object.entries(seriesByChart).forEach(([chartAndGrouping, ser]) => {
-      const [chart, grouping] = chartAndGrouping.split('\r\r');
+      const [chart, grouping] = chartAndGrouping.split(DELIMITER);
 
       const chartTagName = CHART_TAG_BY_CHART_NAME[chart];
 
@@ -338,7 +280,17 @@ class Chart {
       // this.content['c:chartSpace']['c:chart']['c:plotArea'] = this.content['c:chartSpace']['c:chart']['c:plotArea'] || {};
       this.content['c:chartSpace']['c:chart']['c:plotArea'][chartTagName] = this.content['c:chartSpace']['c:chart']['c:plotArea'][chartTagName] || [];
       // minimal chart config
-      const newChart = {};
+      const newChart = {
+        'c:dLbls': {
+          'c:showLegendKey': { $: { val: 0 } },
+          'c:showVal': { $: { val: 0 } },
+          'c:showCatName': { $: { val: 0 } },
+          'c:showSerName': { $: { val: 0 } },
+          'c:showPercent': { $: { val: 0 } },
+          'c:showBubbleSize': { $: { val: 0 } },
+          'c:showLeaderLines': { $: { val: 0 } },
+        },
+      };
 
       if (grouping != 'undefined') {
         newChart['c:grouping'] = {
@@ -389,45 +341,10 @@ class Chart {
             },
           };
         }
-        // if (this.chartOptions.showLabels) {
-        // 	newChart["c:dLbls"] = {
-        // 		"c:showLegendKey": {
-        // 			$: {
-        // 				val: 1,
-        // 			},
-        // 		},
-        // 		"c:showVal": {
-        // 			$: {
-        // 				val: 0,
-        // 			},
-        // 		},
-        // 		"c:showCatName": {
-        // 			$: {
-        // 				val: 0,
-        // 			},
-        // 		},
-        // 		"c:showSerName": {
-        // 			$: {
-        // 				val: 0,
-        // 			},
-        // 		},
-        // 		"c:showPercent": {
-        // 			$: {
-        // 				val: 0,
-        // 			},
-        // 		},
-        // 		"c:showBubbleSize": {
-        // 			$: {
-        // 				val: 0,
-        // 			},
-        // 		},
-        // 		"c:showLeaderLines": {
-        // 			$: {
-        // 				val: 1,
-        // 			},
-        // 		},
-        // 	};
-        // }
+
+        if (this.chartOptions.showLabels) {
+          newChart['c:dLbls']['c:showLegendKey'].$.val = 1;
+        }
       }
 
       newChart['c:ser'] = ser;
@@ -442,48 +359,21 @@ class Chart {
               },
             },
             'c:scaling': {
-              'c:orientation': {
-                $: {
-                  val: 'minMax',
-                },
-              },
+              'c:orientation': { $: { val: 'minMax' } },
             },
-
-            'c:axPos': {
-              $: {
-                val: 'b',
-              },
-            },
-            'c:tickLblPos': {
-              $: {
-                val: 'nextTo',
-              },
-            },
-            'c:crossAx': {
-              $: {
-                val: Math.floor(Math.random() * 100000000),
-              },
-            },
-            'c:crosses': {
-              $: {
-                val: 'autoZero',
-              },
-            },
-            'c:auto': {
-              $: {
-                val: '1',
-              },
-            },
-            'c:lblAlgn': {
-              $: {
-                val: 'ctr',
-              },
-            },
-            'c:lblOffset': {
-              $: {
-                val: '100',
-              },
-            },
+            'c:axPos': { $: { val: 'b' } },
+            'c:tickLblPos': { $: { val: 'nextTo' } },
+            'c:crossAx': [
+              // array is needed here to have multiple crossAx tags
+              { $: { val: Math.floor(Math.random() * 100000000) } },
+            ],
+            'c:crosses': { $: { val: 'autoZero' } },
+            'c:auto': { $: { val: '1' } },
+            'c:lblAlgn': { $: { val: 'ctr' } },
+            'c:lblOffset': { $: { val: 100 } },
+            // 'c:numFmt': [{ $: { formatCode: 'General', sourceLinked: '0' } }],
+            // 'c:majorTickMark': [{ $: { val: 'none' } }],
+            // 'c:minorTickMark': [{ $: { val: 'none' } }],
           };
 
           this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] || [];
@@ -493,24 +383,12 @@ class Chart {
         if (!this.y1Axis) {
           this.y1Axis = {
             'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
-            'c:axId': {
-              $: {
-                val: this.xAxis['c:crossAx']['$'].val,
-              },
-            },
+            'c:axId': { $: { val: this.xAxis['c:crossAx'][0]['$'].val } },
             'c:scaling': {
-              'c:orientation': {
-                $: {
-                  val: 'minMax',
-                },
-              },
+              'c:orientation': { $: { val: 'minMax' } },
             },
-            'c:axPos': {
-              $: {
-                val: 'l',
-              },
-            },
-            'c:majorGridlines': {},
+            'c:axPos': { $: { val: 'l' } },
+            // 'c:majorGridlines': {},
             // 'c:minorGridlines': {},
             'c:numFmt': {
               $: {
@@ -518,26 +396,10 @@ class Chart {
                 sourceLinked: 1,
               },
             },
-            'c:tickLblPos': {
-              $: {
-                val: 'nextTo',
-              },
-            },
-            'c:crossAx': {
-              $: {
-                val: this.xAxis['c:axId']['$'].val,
-              },
-            },
-            'c:crosses': {
-              $: {
-                val: 'autoZero',
-              },
-            },
-            'c:crossBetween': {
-              $: {
-                val: 'between',
-              },
-            },
+            'c:tickLblPos': { $: { val: 'nextTo' } },
+            'c:crossAx': { $: { val: this.xAxis['c:axId']['$'].val } },
+            'c:crosses': { $: { val: 'autoZero' } },
+            'c:crossBetween': { $: { val: 'between' } },
           };
 
           this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] || [];
@@ -545,16 +407,8 @@ class Chart {
         }
 
         newChart['c:axId'] = [
-          {
-            $: {
-              val: this.xAxis['c:axId']['$'].val,
-            },
-          },
-          {
-            $: {
-              val: this.y1Axis['c:axId']['$'].val,
-            },
-          },
+          { $: { val: this.xAxis['c:axId']['$'].val } },
+          { $: { val: this.y1Axis['c:axId']['$'].val } },
         ];
       }
 
@@ -575,36 +429,12 @@ class Chart {
       if (this.chartOptions.manualLayout && this.chartOptions.manualLayout.plotArea) {
         this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout'] || {};
         this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout']['c:manualLayout'] = {
-          'c:xMode': {
-            $: {
-              val: 'edge',
-            },
-          },
-          'c:yMode': {
-            $: {
-              val: 'edge',
-            },
-          },
-          'c:x': {
-            $: {
-              val: this.chartOptions.manualLayout.plotArea.x,
-            },
-          },
-          'c:y': {
-            $: {
-              val: this.chartOptions.manualLayout.plotArea.y,
-            },
-          },
-          'c:w': {
-            $: {
-              val: this.chartOptions.manualLayout.plotArea.w,
-            },
-          },
-          'c:h': {
-            $: {
-              val: this.chartOptions.manualLayout.plotArea.h,
-            },
-          },
+          'c:xMode': { $: { val: 'edge' } },
+          'c:yMode': { $: { val: 'edge' } },
+          'c:x': { $: { val: this.chartOptions.manualLayout.plotArea.x } },
+          'c:y': { $: { val: this.chartOptions.manualLayout.plotArea.y } },
+          'c:w': { $: { val: this.chartOptions.manualLayout.plotArea.w } },
+          'c:h': { $: { val: this.chartOptions.manualLayout.plotArea.h } },
         };
       }
     });

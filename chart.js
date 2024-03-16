@@ -3,6 +3,10 @@ const Chart = require('./chart/base');
 const emptyCallBack = (...args) => args;
 
 /**
+ * @typedef {'noFill'} TransparentPointColor
+ */
+
+/**
  * @typedef OutputByType
  * @type {string | ArrayBuffer | Buffer | Uint8Array | Blob}
  */
@@ -26,7 +30,11 @@ const emptyCallBack = (...args) => args;
 
 /**
  * @description Value of data point
- * @typedef {number|object} DataPoint
+ * @typedef {object} DataPoint
+ * @property {DataPointValue} value - value of data point
+ * @property {string | TransparentPointColor} [fillColor] - color of dot fill
+ * @property {string | TransparentPointColor} [lineColor] - color of dot line
+ * @property {string | TransparentPointColor} [markerColor] - color of dot marker
  */
 
 /**
@@ -36,10 +44,18 @@ const emptyCallBack = (...args) => args;
  */
 
 /**
+ * @typedef {object} CustomColors - custom colors for chart
+ * @property {object.<DataSeriesName, string | { fill: string, line: string, marker: string }>} series - custom colors for series
+ * @property {object.<DataPointName, string | { fill: string, line: string, marker: string }>} points - custom colors for points
+ */
+
+/**
  * @typedef {object} ChartOptions
  * @property {string} chartTitle - title of chart
  * @property {string} chart - type of chart
  * @property {ChartData} data - data for chart
+ * @property {Position?} position - position of chart
+ * @property {CustomColors?} customColors - custom colors for chart
  * @property {string[]?} titles - data series of chart
  * @property {string[]?} fields - data points of chart (commonly x-series)
  */

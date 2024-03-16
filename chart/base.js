@@ -133,7 +133,6 @@ class ExcelFile {
       let drawing;
 
       const {
-        data,
         fields,
         chartTitle,
       } = chartConfig;
@@ -146,17 +145,17 @@ class ExcelFile {
         drawing = this.document.drawings[0]; // the single drawing is for all charts
       }
 
-      worksheet.setWorksheetData(data, rowOffset);
+      worksheet.setWorksheetData(chartConfig, rowOffset);
 
       const chart = new Chart(worksheet.name, chartConfig);
 
       chart.setChartName(chartTitle);
-      chart.setChartData(data, rowOffset);
+      chart.setChartData(chartConfig, rowOffset);
 
       drawing.charts.push(chart);
       this.addItem(chart);
 
-      if (options.dataPerSheet) {
+      if (!options.dataPerSheet) {
         rowOffset += fields.length + 2; // +2 for header and empty row
       }
     });
@@ -177,7 +176,7 @@ class ExcelFile {
       charts.forEach(({ fileName, content }) => this.zip
         .folder('xl')
         .folder('charts')
-        .file(fileName, (console.log(content), this.xmlBuilder.buildObject(content))));
+        .file(fileName, this.xmlBuilder.buildObject(content)));
     });
 
     this.zip
