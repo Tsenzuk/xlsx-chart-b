@@ -112,7 +112,7 @@ class ExcelFile {
       options.charts.forEach((chartConfig) => {
         const { chartTitle } = chartConfig;
 
-        const worksheet = new Worksheet(chartTitle);
+        const worksheet = new Worksheet(chartTitle.replace(/[\n\r]/g, ' '));
         this.addItem(worksheet);
 
         const drawing = new Drawing();
