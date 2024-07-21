@@ -173,6 +173,8 @@ class ExcelFile {
         .folder('drawings')
         .file(fileName, this.xmlBuilder.buildObject(content));
 
+      console.log('charts', JSON.stringify(charts[0].content, null, 2));
+
       charts.forEach(({ fileName, content }) => this.zip
         .folder('xl')
         .folder('charts')

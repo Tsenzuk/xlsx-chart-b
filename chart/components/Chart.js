@@ -47,8 +47,6 @@ const DEFAULT_CHART_OPTIONS = {
   manualLayout: null,
 };
 
-const DELIMITER = '\r\r';
-
 let chartCounter = 1;
 
 class Chart {
@@ -78,17 +76,6 @@ class Chart {
    * @param {{ x: number, y: number }} [titlePosition]
    */
   setChartName(title, titlePosition = null) {
-    const layout = {};
-
-    if (titlePosition) {
-      layout['c:manualLayout'] = {
-        'c:xMode': { $: { val: 'edge' } },
-        'c:yMode': { $: { val: 'edge' } },
-        'c:x': { $: { val: titlePosition.x } },
-        'c:y': { $: { val: titlePosition.y } },
-      };
-    }
-
     this.content['c:chartSpace']['c:chart']['c:title'] = {
       'c:tx': {
         'c:rich': {
@@ -105,190 +92,160 @@ class Chart {
           },
         },
       },
-      'c:layout': layout,
-      'c:overlay': { $: { val: '0' } },
+      'c:layout': this.getLayoutProperties(titlePosition),
+      'c:overlay': { $: { val: 0 } },
     };
+  }
+
+  getLayoutProperties(position) {
+    if (!position) {
+      return null;
+    }
+
+    const layoutProperties = {
+      'c:manualLayout': {},
+    };
+
+    ['xMode', 'yMode', 'x', 'y', 'w', 'h'].forEach((field) => {
+      if (field in position) {
+        layoutProperties['c:manualLayout'][`c:${field}`] = { $: { val: position[field] } };
+      }
+    });
+
+    return layoutProperties;
+  }
+
+  getChartShapeProperties(chartShape) {
+    const chartShapeProperties = {};
+
+    if (chartShape.fill === 'noFill' && chartShape.line === 'noFill' && chartShape.marker === 'noFill') {
+      chartShapeProperties['a:noFill'] = '';
+      return chartShapeProperties;
+    }
+
+    if (chartShape.fill) {
+      if (chartShape.fill.solidFill) {
+        chartShapeProperties['a:solidFill'] = {
+          'a:srgbClr': { $: { val: chartShape.fill.solidFill } },
+        };
+      }
+    }
+
+    if (chartShape.line) {
+      if (chartShape.line.solidFill) {
+        chartShapeProperties['a:ln'] = {
+          'a:solidFill': {
+            'a:srgbClr': { $: { val: chartShape.line.solidFill } },
+          },
+        };
+      }
+    }
+
+    if (chartShape.marker) {
+      if (chartShape.marker.solidFill) {
+        chartShapeProperties['a:marker'] = {
+          'c:spPr': {
+            'a:solidFill': {
+              'a:srgbClr': { $: { val: chartShape.marker.solidFill } },
+            },
+          },
+        };
+      }
+    }
+
+    return chartShapeProperties;
+  }
+
+  getAxisProperties(axisConfig) {
+    if (!axisConfig) {
+      return null;
+    }
+
+    const returnAxis = {};
+    [
+      'delete',
+      'axId',
+      'crossAx',
+      'auto',
+      'lblOffset',
+    ].forEach((field) => {
+      if (field in axisConfig) {
+        returnAxis[`c:${field}`] = { $: { val: +axisConfig[field] } };
+      }
+    });
+
+    [
+      'axPos',
+      'tickLblPos',
+      'crosses',
+      'crossBetween',
+      // 'majorTickMark',
+      // 'minorTickMark',
+    ].forEach((field) => {
+      if (field in axisConfig) {
+        returnAxis[`c:${field}`] = { $: { val: axisConfig[field] } };
+      }
+    });
+
+    if (axisConfig.scaling) {
+      returnAxis['c:scaling'] = {};
+      [
+        'orientation',
+        // 'min',
+        // 'max',
+        // 'logBase',
+      ].forEach((field) => {
+        returnAxis['c:scaling'][`c:${field}`] = { $: { val: axisConfig.scaling[field] } };
+      });
+    }
+
+    if (axisConfig.numFmt) {
+      returnAxis['c:numFmt'] = {
+        $: {
+          formatCode: axisConfig.numFmt.formatCode,
+          sourceLinked: +axisConfig.numFmt.sourceLinked,
+        },
+      };
+    }
+
+    console.log('axisConfig', returnAxis);
+
+    return returnAxis;
   }
 
   setChartData(chartConfig, rowOffset = 0, columnOffset = 0) {
     // Group series by chart type and grouping
     // it is needed to gather all series of the same type and grouping together as single chart layer
-    const seriesByChart = chartConfig[this.titlesField].reduce((seriesByChart, columnName, columnIndex) => {
-      const columnData = chartConfig.data[columnName];
-      const chart = columnData[this.chartTypeField] || this.chartOptions.chart;
-      const grouping = columnData.grouping || this.chartOptions.grouping || CHART_GROUPING_BY_CHART_NAME[chart];
 
-      const customColorsPoints = {
-        'c:dPt': [],
-      };
-      const customColorsSeries = {
-        'c:spPr': {},
-      };
+    console.log('dataLayers', chartConfig.properties.dataLayers);
 
-      customColorsPoints['c:dPt'] = chartConfig[this.fieldsField].map((field, i) => {
-        const fillColor = chartConfig.data[columnName][field][this.fillColorField];
-        const lineColor = chartConfig.data[columnName][field][this.lineColorField];
-        const markerColor = chartConfig.data[columnName][field][this.markerColorField];
+    this.xAxis = this.getAxisProperties(chartConfig.properties.axes.category);
+    this.y1Axis = this.getAxisProperties(chartConfig.properties.axes.primary);
+    this.y2Axis = this.getAxisProperties(chartConfig.properties.axes.secondary);
 
-        const dataPointConfig = {
-          'c:idx': { $: { val: i } },
-          'c:spPr': {},
-        };
+    this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] = [];
+    this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] = [];
 
-        if (!fillColor || !lineColor || !markerColor) {
-          return null;
-        }
+    if (this.xAxis) {
+      this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'].push(this.xAxis);
+    }
 
+    if (this.y1Axis) {
+      this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'].push(this.y1Axis);
+    }
 
-        if (fillColor === 'noFill' && lineColor === 'noFill' && markerColor === 'noFill') {
-          dataPointConfig['c:spPr'] = {
-            'a:noFill': '',
-          };
+    if (this.y2Axis) {
+      this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'].push(this.y2Axis);
+    }
 
-          return dataPointConfig;
-        }
+    const chartTags = chartConfig.properties.dataLayers.reduce((chartTags, dataLayer) => {
+      const chart = dataLayer.chart || this.chartOptions.chart;
+      const grouping = dataLayer.grouping || this.chartOptions.grouping || CHART_GROUPING_BY_CHART_NAME[chart];
+      // const varyColors = dataLayer.varyColors || this.chartOptions.varyColors || 1;
 
-        if (fillColor) {
-          dataPointConfig['c:spPr']['a:solidFill'] = {
-            'a:srgbClr': { $: { val: fillColor } },
-          };
-        }
-
-        if (lineColor) {
-          dataPointConfig['c:spPr']['a:ln'] = {
-            'a:solidFill': {
-              'a:srgbClr': { $: { val: lineColor } },
-            },
-          };
-        }
-
-        if (markerColor) {
-          dataPointConfig['c:spPr']['c:marker'] = {
-            'c:spPr': {
-              'a:solidFill': {
-                'a:srgbClr': { $: { val: markerColor } },
-              },
-            },
-          };
-        }
-
-        return dataPointConfig;
-      }).filter(Boolean);
-
-      if (chartConfig.data[columnName][this.fillColorField]) {
-        customColorsSeries['c:spPr']['a:solidFill'] = {
-          'a:srgbClr': { $: { val: chartConfig.data[columnName][this.fillColorField] } },
-        };
-      }
-
-      if (chartConfig.data[columnName][this.lineColorField]) {
-        customColorsSeries['c:spPr']['a:ln'] = {
-          'a:solidFill': {
-            'a:srgbClr': { $: { val: chartConfig.data[columnName][this.lineColorField] } },
-          },
-        };
-      }
-
-      if (chartConfig.data[columnName][this.markerColorField]) {
-        customColorsSeries['c:spPr']['c:marker'] = {
-          'c:spPr': {
-            'a:solidFill': {
-              'a:srgbClr': { $: { val: chartConfig.data[columnName][this.markerColorField] } },
-            },
-          },
-        };
-      }
-
-      const ser = {
-        'c:idx': { $: { val: columnIndex } },
-        'c:order': { $: { val: columnIndex } },
-        'c:tx': {
-          'c:strRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 1}`,
-            'c:strCache': {
-              'c:ptCount': { $: { val: 1 } },
-              'c:pt': {
-                '$': {
-                  idx: 0,
-                },
-                'c:v': columnName,
-              },
-            },
-          },
-        },
-        ...customColorsPoints,
-        ...customColorsSeries,
-        'c:cat': {
-          'c:strRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(1 + columnOffset)}$${rowOffset + 2}:$${getColName(1 + columnOffset)}$${chartConfig[this.fieldsField].length + rowOffset + 1}`,
-            'c:strCache': {
-              'c:ptCount': { $: { val: chartConfig[this.fieldsField].length } },
-              'c:pt': chartConfig[this.fieldsField].map((rowName, rowIndex) => {
-                return {
-                  '$': {
-                    idx: rowIndex,
-                  },
-                  'c:v': rowName,
-                };
-              }),
-            },
-          },
-        },
-        'c:val': {
-          'c:numRef': {
-            'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 2}:$${getColName(columnIndex + 2)}$${chartConfig[this.fieldsField].length + rowOffset + 1}`,
-            'c:numCache': {
-              'c:formatCode': 'General',
-              'c:ptCount': { $: { val: chartConfig[this.fieldsField].length } },
-              'c:pt': chartConfig[this.fieldsField].map((rowName, rowIndex) => {
-                return {
-                  '$': {
-                    idx: rowIndex,
-                  },
-                  'c:v': columnData[rowName].value,
-                };
-              }),
-            },
-          },
-        },
-      };
-
-      if (chart == 'scatter') {
-        ser['c:xVal'] = ser['c:cat'];
-        delete ser['c:cat'];
-        ser['c:yVal'] = ser['c:val'];
-        delete ser['c:val'];
-        ser['c:spPr'] = {
-          'a:ln': {
-            '$': {
-              w: 28575,
-            },
-            'a:noFill': '',
-          },
-        };
-      }
-
-      const seriesKey = `${chart}${DELIMITER}${grouping}`;
-      seriesByChart[seriesKey] = seriesByChart[seriesKey] || [];
-      seriesByChart[seriesKey].push(ser);
-
-      return seriesByChart;
-    }, {});
-
-
-    Object.entries(seriesByChart).forEach(([chartAndGrouping, ser]) => {
-      const [chart, grouping] = chartAndGrouping.split(DELIMITER);
-
-      const chartTagName = CHART_TAG_BY_CHART_NAME[chart];
-
-      if (!chartTagName) {
-        throw new Error(`Chart type '${chart}' is not supported`);
-      }
-
-      // this.content['c:chartSpace']['c:chart']['c:plotArea'] = this.content['c:chartSpace']['c:chart']['c:plotArea'] || {};
-      this.content['c:chartSpace']['c:chart']['c:plotArea'][chartTagName] = this.content['c:chartSpace']['c:chart']['c:plotArea'][chartTagName] || [];
-      // minimal chart config
-      const newChart = {
+      const chartTag = {
+        'c:grouping': { $: { val: grouping } },
+        // 'c:varyColors': { $: { val: +varyColors } },
         'c:dLbls': {
           'c:showLegendKey': { $: { val: 0 } },
           'c:showVal': { $: { val: 0 } },
@@ -298,189 +255,199 @@ class Chart {
           'c:showBubbleSize': { $: { val: 0 } },
           'c:showLeaderLines': { $: { val: 0 } },
         },
+        'c:axId': [
+          { $: { val: this.xAxis?.['c:axId'].$.val || 0 } },
+          { $: { val: this.y1Axis?.['c:axId'].$.val || 0 } },
+        ],
       };
 
-      if (grouping != 'undefined') {
-        newChart['c:grouping'] = {
-          $: {
-            val: grouping || CHART_GROUPING_BY_CHART_NAME[chart],
-          },
-        };
-        if (grouping == 'stacked') {
-          newChart['c:overlap'] = {
-            $: {
-              val: 100, // usually stacked expected to be seen with overlap 100%
-            },
-          };
-        }
+      if (grouping === 'stacked' || grouping === 'percentStacked') {
+        chartTag['c:overlap'] = { $: { val: 100 } }; // usually stacked expected to be seen with overlap 100%
       }
 
-      if (chart === 'column' || chart === 'bar') {
-        // clone barChart from template
-        // newChart = _.clone (me.chartTemplate ["c:chartSpace"]["c:chart"]["c:plotArea"][templateChartName]);
-        newChart['c:barDir'] = {
-          $: {
-            val: chart.substr(0, 3),
-          },
-        };
-
-      } else if (chart == 'line' || chart == 'area' || chart == 'radar' || chart == 'scatter') {
-        // newChart = _.clone (me.chartTemplate ['c:chartSpace']['c:chart']['c:plotArea'][templateChartName]);
-        // delete newChart['c:barDir'];
-        newChart['c:marker'] = { $: { val: 1 } };
-      } else {
-        newChart['c:varyColors'] = {
-          $: {
-            val: 1,
-          },
-        };
-
-        newChart['c:ser'] = ser;
-
-        if (this.chartOptions.firstSliceAng) {
-          newChart['c:firstSliceAng'] = {
-            $: {
-              val: this.chartOptions.firstSliceAng,
-            },
-          };
-        }
-
-        if (this.chartOptions.holeSize) {
-          newChart['c:holeSize'] = {
-            $: {
-              val: this.chartOptions.holeSize,
-            },
-          };
-        }
-
-        if (this.chartOptions.showLabels) {
-          newChart['c:dLbls']['c:showLegendKey'].$.val = 1;
-        }
+      switch (chart) {
+        case 'column':
+        case 'bar':
+          chartTag['c:barDir'] = { $: { val: chart.substring(0, 3) } };
+          break;
+        case 'line':
+        case 'area':
+        case 'radar':
+        case 'scatter':
+          chartTag['c:marker'] = { $: { val: 1 } }; // TODO: add marker support
+          break;
+        default:
+        // do nothing
       }
 
-      newChart['c:ser'] = ser;
+      [
+        'firstSliceAng',
+        'holeSize',
+        // 'invertIfNegative',
+      ].forEach((field) => {
+        if (field in dataLayer) {
+          chartTag[`c:${field}`] = { $: { val: +dataLayer[field] } };
+        }
+      });
 
-      if (chart === 'column' || chart === 'bar' || chart === 'line' || chart === 'area' || chart === 'scatter') {
-        if (!this.xAxis) {
-          this.xAxis = {
-            'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
-            'c:axId': {
-              $: {
-                val: Math.floor(Math.random() * 100000000),
+      if (dataLayer.labels) {
+        chartTag['c:dLbls'] = Object.entries(dataLayer.labels).reduce((dLbls, [key, value]) => {
+          dLbls[`c:${key}`] = { $: { val: +value } };
+          return dLbls;
+        }, chartTag['c:dLbls']);
+      }
+
+      console.log('dataLayer', dataLayer);
+
+      chartTag['c:ser'] = Object.entries(dataLayer.series).map(([title, seriesData], columnIndex) => {
+        const customColorsSeries = {};
+        const customColorsPoints = {};
+
+        if (seriesData.chartShape) {
+          customColorsSeries['c:spPr'] = this.getChartShapeProperties(seriesData.chartShape);
+        }
+
+        if (seriesData.points) {
+          customColorsPoints['c:dPt'] = Object.entries(seriesData.points).map(([field, point]) => {
+            const fieldIndex = chartConfig.fields.indexOf(field);
+
+            const dataPoint = {
+              'c:idx': { $: { val: fieldIndex } },
+            };
+
+            ['bubble3D', 'explosion', 'invertIfNegative'].forEach((field) => {
+              if (field in point) {
+                dataPoint[`c:${field}`] = { $: { val: +point[field] } };
+              }
+            });
+
+            if (point.chartShape) {
+              dataPoint['c:spPr'] = this.getChartShapeProperties(point.chartShape);
+            }
+
+            return dataPoint;
+          }).filter(Boolean);
+        }
+
+        const ser = {
+          'c:idx': { $: { val: columnIndex } },
+          'c:order': { $: { val: columnIndex } },
+          'c:tx': {
+            'c:strRef': {
+              'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 1}`,
+              'c:strCache': {
+                'c:ptCount': { $: { val: 1 } },
+                'c:pt': {
+                  '$': {
+                    idx: 0,
+                  },
+                  'c:v': title,
+                },
               },
             },
-            'c:scaling': {
-              'c:orientation': { $: { val: 'minMax' } },
-            },
-            'c:axPos': { $: { val: 'b' } },
-            'c:tickLblPos': { $: { val: 'nextTo' } },
-            'c:crossAx': [
-              // array is needed here to have multiple crossAx tags
-              { $: { val: Math.floor(Math.random() * 100000000) } },
-            ],
-            'c:crosses': { $: { val: 'autoZero' } },
-            'c:auto': { $: { val: '1' } },
-            'c:lblAlgn': { $: { val: 'ctr' } },
-            'c:lblOffset': { $: { val: 100 } },
-            // 'c:numFmt': [{ $: { formatCode: 'General', sourceLinked: '0' } }],
-            // 'c:majorTickMark': [{ $: { val: 'none' } }],
-            // 'c:minorTickMark': [{ $: { val: 'none' } }],
-          };
-
-          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'] || [];
-          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:catAx'].push(this.xAxis);
-        }
-
-        if (!this.y1Axis) {
-          this.y1Axis = {
-            'c:delete': [{ $: { val: '0' } }], // delete axis, value not set or set to 1, means deleted
-            'c:axId': { $: { val: this.xAxis['c:crossAx'][0]['$'].val } },
-            'c:scaling': {
-              'c:orientation': { $: { val: 'minMax' } },
-            },
-            'c:axPos': { $: { val: 'l' } },
-            // 'c:majorGridlines': {},
-            // 'c:minorGridlines': {},
-            'c:numFmt': {
-              $: {
-                formatCode: 'General',
-                sourceLinked: 1,
+          },
+          'c:cat': {
+            'c:strRef': {
+              'c:f': `'${this.dataWorksheetName}'!$${getColName(1 + columnOffset)}$${rowOffset + 2}:$${getColName(1 + columnOffset)}$${chartConfig[this.fieldsField].length + rowOffset + 1}`,
+              'c:strCache': {
+                'c:ptCount': { $: { val: chartConfig.fields.length } },
+                'c:pt': chartConfig.fields.map((field, rowIndex) => {
+                  return {
+                    '$': {
+                      idx: rowIndex,
+                    },
+                    'c:v': field,
+                  };
+                }),
               },
             },
-            'c:tickLblPos': { $: { val: 'nextTo' } },
-            'c:crossAx': { $: { val: this.xAxis['c:axId']['$'].val } },
-            'c:crosses': { $: { val: 'autoZero' } },
-            'c:crossBetween': { $: { val: 'between' } },
-          };
-
-          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'] || [];
-          this.content['c:chartSpace']['c:chart']['c:plotArea']['c:valAx'].push(this.y1Axis);
-
-          if (chartConfig.majorGridlines) {
-            this.y1Axis['c:majorGridlines'] = {};
-          }
-        }
-
-        newChart['c:axId'] = [
-          { $: { val: this.xAxis['c:axId']['$'].val } },
-          { $: { val: this.y1Axis['c:axId']['$'].val } },
-        ];
-      }
-
-      this.content['c:chartSpace']['c:chart']['c:plotArea'][chartTagName].push(newChart);
-
-      if (this.chartOptions.legendPos === undefined || this.chartOptions.legendPos) {
-        this.content['c:chartSpace']['c:chart']['c:legend'] = {
-          'c:legendPos': {
-            $: {
-              val: this.legendPos || 'r',
+          },
+          'c:val': {
+            'c:numRef': {
+              'c:f': `'${this.dataWorksheetName}'!$${getColName(columnIndex + 2)}$${rowOffset + 2}:$${getColName(columnIndex + 2)}$${chartConfig[this.fieldsField].length + rowOffset + 1}`,
+              'c:numCache': {
+                'c:formatCode': 'General',
+                'c:ptCount': { $: { val: chartConfig.fields.length } },
+                'c:pt': chartConfig.fields.map((field, rowIndex) => {
+                  return {
+                    '$': {
+                      idx: rowIndex,
+                    },
+                    'c:v': chartConfig.data[title]?.[field] ?? 0,
+                  };
+                }),
+              },
             },
           },
+          // ...customColorsSeries,
+          // ...customColorsPoints,
         };
-      } else if (this.chartOptions.legendPos === null) {
-        delete this.content['c:chartSpace']['c:chart']['c:legend'];
+
+        return ser;
+      });
+
+      const chartTagName = CHART_TAG_BY_CHART_NAME[chart];
+
+      if (!chartTagName) {
+        throw new Error(`Chart type '${chart}' is not supported`);
       }
 
-      if (this.chartOptions.manualLayout && this.chartOptions.manualLayout.plotArea) {
-        this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout'] || {};
-        this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout']['c:manualLayout'] = {
-          'c:xMode': { $: { val: 'edge' } },
-          'c:yMode': { $: { val: 'edge' } },
-          'c:x': { $: { val: this.chartOptions.manualLayout.plotArea.x } },
-          'c:y': { $: { val: this.chartOptions.manualLayout.plotArea.y } },
-          'c:w': { $: { val: this.chartOptions.manualLayout.plotArea.w } },
-          'c:h': { $: { val: this.chartOptions.manualLayout.plotArea.h } },
-        };
-      }
-    });
+      return {
+        ...chartTags,
+        [chartTagName]: chartTag,
+      };
+    }, {});
+
+    this.content['c:chartSpace']['c:chart']['c:plotArea'] = {
+      'c:layout': this.getLayoutProperties(chartConfig.properties.plotArea),
+      ...this.content['c:chartSpace']['c:chart']['c:plotArea'],
+      ...chartTags,
+    };
+
+    delete this.content['c:chartSpace']['c:chart']['c:legend'];
+
+
+    // if (this.chartOptions.legendPos === undefined || this.chartOptions.legendPos) {
+    //   this.content['c:chartSpace']['c:chart']['c:legend'] = {
+    //     'c:legendPos': {
+    //       $: {
+    //         val: this.legendPos || 'r',
+    //       },
+    //     },
+    //   };
+    // } else if (this.chartOptions.legendPos === null) {
+    //   delete this.content['c:chartSpace']['c:chart']['c:legend'];
+    // }
+
+    // if (this.chartOptions.manualLayout && this.chartOptions.manualLayout.plotArea) {
+    //   this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout'] = this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout'] || {};
+    //   this.content['c:chartSpace']['c:chart']['c:plotArea']['c:layout']['c:manualLayout'] = {
+    //     'c:xMode': { $: { val: 'edge' } },
+    //     'c:yMode': { $: { val: 'edge' } },
+    //     'c:x': { $: { val: this.chartOptions.manualLayout.plotArea.x } },
+    //     'c:y': { $: { val: this.chartOptions.manualLayout.plotArea.y } },
+    //     'c:w': { $: { val: this.chartOptions.manualLayout.plotArea.w } },
+    //     'c:h': { $: { val: this.chartOptions.manualLayout.plotArea.h } },
+    //   };
+    // }
   }
 
   getRelationship(relationshipId) {
-    const position = Object.assign({
-      fromColumn: 0,
-      fromColumnOffset: 0,
-      fromRow: this.id * 20,
-      fromRowOffset: 0,
-      toColumn: 10,
-      toColumnOffset: 0,
-      toRow: (this.id + 1) * 20,
-      toRowOffset: 0,
-    },
-      this.chartOptions.position
-    );
+    const position = this.chartOptions.properties.chartArea.twoCellAnchor;
+    const name = this.chartOptions.properties.chartArea.name;
 
     return {
       'xdr:from': {
-        'xdr:col': position.fromColumn,
-        'xdr:colOff': position.fromColumnOffset,
-        'xdr:row': position.fromRow,
-        'xdr:rowOff': position.fromRowOffset,
+        'xdr:col': position.from.col,
+        'xdr:colOff': position.from.colOff,
+        'xdr:row': position.from.row,
+        'xdr:rowOff': position.from.rowOff,
       },
       'xdr:to': {
-        'xdr:col': position.toColumn,
-        'xdr:colOff': position.toColumnOffset,
-        'xdr:row': position.toRow,
-        'xdr:rowOff': position.toRowOffset,
+        'xdr:col': position.to.col,
+        'xdr:colOff': position.to.colOff,
+        'xdr:row': position.to.row,
+        'xdr:rowOff': position.to.rowOff,
       },
       'xdr:graphicFrame': {
         '$': {
@@ -490,7 +457,7 @@ class Chart {
           'xdr:cNvPr': {
             $: {
               id: `${this.id + 1}`,
-              name: `Diagram ${this.id}`,
+              name,
             },
           },
           'xdr:cNvGraphicFramePr': {},

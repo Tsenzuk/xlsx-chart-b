@@ -41,7 +41,7 @@ class Worksheet {
       $: {
         r: 1 + rowOffset,
       },
-      c: chartConfig[chartConfig.titlesField].map((columnName, columnIndex) => ({
+      c: chartConfig.titles.map((columnName, columnIndex) => ({
         $: {
           r: `${getColName(columnIndex + 2 + columnOffset)}${1 + rowOffset}`,
           t: 'str',
@@ -52,7 +52,7 @@ class Worksheet {
       })),
     });
 
-    chartConfig[chartConfig.fieldsField].forEach((rowName, rowIndex) => this.content.worksheet.sheetData.row.push({
+    chartConfig.fields.forEach((rowName, rowIndex) => this.content.worksheet.sheetData.row.push({
       $: {
         r: rowIndex + 2 + rowOffset,
       },
@@ -66,12 +66,12 @@ class Worksheet {
             rowName,
           ],
         },
-        ...chartConfig[chartConfig.titlesField].map((columnName, columnIndex) => ({
+        ...chartConfig.titles.map((columnName, columnIndex) => ({
           $: {
             r: `${getColName(columnIndex + 2 + columnOffset)}${rowIndex + 2 + rowOffset}`,
           },
           v: [
-            data[columnName][rowName].value || '',
+            data[columnName][rowName] || '',
           ],
         })),
       ],

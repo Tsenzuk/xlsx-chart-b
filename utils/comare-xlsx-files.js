@@ -94,4 +94,9 @@ async function main(file1, file2, fileToShowDetails) {
 
 }
 
+if (!file1 || !file2) {
+  console.log('Usage: node compare-xlsx-files.js file1 file2 [fileToShowDetails]');
+  process.exit(0);
+}
+
 main(file1, file2, fileToShowDetails);
